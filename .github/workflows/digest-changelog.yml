@@ -1,0 +1,107 @@
+name: Digest Changelog
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Digest release notes with LLM
+        env:
+          PYDANTIC_AI_GATEWAY_API_KEY: ${{ secrets.PYDANTIC_AI_GATEWAY_API_KEY }}
+          TAG: ${{ github.event.release.tag_name }}
+          RELEASE_NAME: ${{ github.event.release.name }}
+          RELEASE_BODY: ${{ github.event.release.body }}
+          RELEASE_DATE: ${{ github.event.release.published_at }}
+        run: |
+          # Format date (GNU coreutils on ubuntu)
+          DATE=$(date -d "$RELEASE_DATE" '+%Y-%m-%d')
+          DATE_LONG=$(date -d "$RELEASE_DATE" '+%B %-d, %Y')
+
+          # Strip leading 'v' from tag for version
+          VERSION="${TAG#v}"
+
+          # Build the LLM request body using jq (avoids shell escaping issues)
+          SYSTEM_PROMPT=$(cat <<'PROMPT'
+          You rewrite GitHub release notes for Substrate, a product by Bedrock Dynamics.
+
+          Context: Substrate is an integrated development environment for robotics and physical computing.
+
+          Rules:
+          - Write for end-users, not developers
+          - Strip: dependency bumps, CI changes, refactors, internal tooling
+          - Keep 3-8 bullet points max
+          - Group under: What's New, Improved, Fixed (skip empty groups)
+          - Tone: clean, concise, slightly warm. No corporate speak.
+          - Use markdown. No emoji in headers. Small emoji in bullets OK.
+          - Start with a one-sentence hook about the release
+          - Version number goes in the filename, not the body
+          - End with a horizontal rule (---) and a haiku in italics related to the release content. Make it fun, on-brand, and reference robotics or physical computing when possible.
+          PROMPT
+          )
+
+          # Call Pydantic AI Gateway
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST "https://gateway.pydantic.dev/proxy/claude-substrate/v1/messages" \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: $PYDANTIC_AI_GATEWAY_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -d "$(jq -n \
+              --arg system "$SYSTEM_PROMPT" \
+              --arg body "Rewrite the following ${TAG} release notes:\n\n${RELEASE_BODY}" \
+              '{
+                model: "claude-haiku-4-5",
+                system: $system,
+                messages: [{role: "user", content: $body}],
+                max_tokens: 1024
+              }')")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY_RESPONSE=$(echo "$RESPONSE" | sed '$d')
+
+          DIGESTED=""
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            DIGESTED=$(echo "$BODY_RESPONSE" | jq -r '.content[0].text // empty')
+          fi
+
+          # Fallback to raw release body if LLM fails
+          if [ -z "$DIGESTED" ]; then
+            echo "::warning::LLM digest failed (HTTP $HTTP_CODE), using raw release notes"
+            DIGESTED="$RELEASE_BODY"
+          fi
+
+          # Write per-version changelog file with frontmatter
+          mkdir -p changelogs
+          {
+            echo "---"
+            echo "version: \"${VERSION}\""
+            echo "date: \"${DATE}\""
+            echo "title: \"${RELEASE_NAME}\""
+            echo "---"
+            echo ""
+            echo "$DIGESTED"
+          } > "changelogs/${TAG}.md"
+
+          # Prepend entry to CHANGELOG.md (after the "## Releases" line)
+          ENTRY="- [${TAG}](changelogs/${TAG}.md) — ${RELEASE_NAME} (${DATE_LONG})"
+          sed -i "/^## Releases$/a\\
+          ${ENTRY}" CHANGELOG.md
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add changelogs/ CHANGELOG.md
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+          git commit -m "docs: add digested changelog for ${{ github.event.release.tag_name }}"
+          git push origin main

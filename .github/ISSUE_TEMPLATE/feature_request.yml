@@ -1,0 +1,51 @@
+name: Feature Request
+description: Suggest a feature or improvement
+labels: ["feature"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Use Case
+      description: What are you trying to do? What's the pain point?
+      placeholder: I'm trying to... but I can't because...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: How would you like this to work?
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you tried any workarounds?
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected Area
+      description: Which part of Substrate does this relate to?
+      multiple: true
+      options:
+        - Editor
+        - Simulation
+        - 3D Viewer
+        - Graph Editor
+        - AI / Agent
+        - Drone / Flight
+        - Telemetry
+        - Robot Models
+        - Terminal
+        - Playback
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority to You
+      options:
+        - Critical for my workflow
+        - Nice to have
+        - Just an idea

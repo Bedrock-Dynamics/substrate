@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://docs.bedrockdynamics.studio
+    about: Read the Substrate documentation
+  - name: Changelog
+    url: https://bedrockdynamics.studio/changelog
+    about: See what's new in the latest release
+  - name: Download Substrate
+    url: https://bedrockdynamics.studio/download
+    about: Download Substrate for macOS, Windows, or Linux

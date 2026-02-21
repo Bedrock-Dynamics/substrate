@@ -4,6 +4,7 @@ All notable changes to [Substrate](https://bedrockdynamics.studio) are documente
 Each release is digested by AI for readability. Raw release notes are available on the [Releases](https://github.com/Bedrock-Dynamics/substrate/releases) page.
 
 ## Releases
+- [v0.1.5](changelogs/v0.1.5.md) — v0.1.5 (February 21, 2026)
 - [v0.0.1-test](changelogs/v0.0.1-test.md) — Test Release (February 20, 2026)
 
 <!-- New releases are prepended here automatically by the digest-changelog workflow -->
